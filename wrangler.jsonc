@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "my-sandbox",
+	"name": "dbtrunner",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-05-06",
 	"compatibility_flags": [
@@ -17,8 +17,8 @@
 		{
 			"class_name": "Sandbox",
 			"image": "./Dockerfile",
-			"instance_type": "lite",
-			"max_instances": 1
+			"instance_type": "basic",
+			"max_instances": 3
 		}
 	],
 	"durable_objects": {

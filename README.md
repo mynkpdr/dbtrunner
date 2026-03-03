@@ -1,92 +1,82 @@
-# Minimal Sandbox SDK Example
+# Sandbox DBT Runner
 
-A minimal Cloudflare Worker that demonstrates the core capabilities of the Sandbox SDK.
+Lightweight Cloudflare Worker that runs DBT projects inside ephemeral Sandbox containers and streams logs back to the client via Server-Sent Events (SSE).
 
-## Features
+**Key endpoints**
 
-- **Command Execution**: Execute Python code in isolated containers
-- **File Operations**: Read and write files in the sandbox filesystem
-- **Simple API**: Two endpoints demonstrating basic sandbox operations
+- POST /auth — Verify a Google ID token and return a signed JWT for subsequent requests.
+  - Request: JSON { "id_token": "<Google ID token>" }
+  - Response: { "token": "<JWT>", "user": { sub, email, name, picture } }
 
-## How It Works
+- POST /api/run — Submit a DBT project archive (multipart/form-data) and receive a real-time SSE stream of logs.
+  - Headers: `Authorization: Bearer <JWT>`
+  - Body: form field `project_zip` containing a ZIP file of the DBT project
+  - Response: text/event-stream (SSE) lines `data: ...`
 
-This example provides two simple endpoints:
+Requirements
 
-1. **`/run`** - Executes Python code and returns the output
-2. **`/file`** - Creates a file, reads it back, and returns the contents
+- Node.js (for running Wrangler locally)
+- Wrangler (>= v4)
+- Docker (for building/using the local Sandbox image when running `wrangler dev`)
 
-## API Endpoints
+Important configuration
 
-### Execute Python Code
+- Secrets (store with `wrangler secret put`):
+  - `JWT_SECRET` — random secret used to sign HS256 JWTs
+  - `GOOGLE_CLIENT_ID` — (optional) Google OAuth client id to validate tokens
+- Optional environment variables (comma-separated strings):
+  - `ALLOWED_EMAIL_DOMAINS` — restrict sign-ins to domains (example: example.com,acme.org)
+  - `ALLOWED_EMAILS` — allowlist specific addresses
+- Sandbox binding: `Sandbox` Durable Object is declared in `wrangler.jsonc` and the container image is built from `Dockerfile`.
 
-```bash
-GET http://localhost:8787/run
-```
+Local development
 
-Runs `python -c "print(2 + 2)"` and returns:
-
-```json
-{
-  "output": "4\n",
-  "success": true
-}
-```
-
-### File Operations
-
-```bash
-GET http://localhost:8787/file
-```
-
-Creates `/workspace/hello.txt`, reads it back, and returns:
-
-```json
-{
-  "content": "Hello, Sandbox!"
-}
-```
-
-## Setup
-
-1. From the project root, run:
+1. Install dependencies
 
 ```bash
 npm install
-npm run build
 ```
 
-2. Run locally:
+2. Add required secrets
 
 ```bash
-cd examples/minimal # if you're not already here
-npm run dev
+wrangler secret put JWT_SECRET
+wrangler secret put GOOGLE_CLIENT_ID   # optional
 ```
 
-The first run will build the Docker container (2-3 minutes). Subsequent runs are much faster.
-
-## Testing
+3. Start the local dev environment
 
 ```bash
-# Test command execution
-curl http://localhost:8787/run
-
-# Test file operations
-curl http://localhost:8787/file
+wrangler dev
 ```
 
-## Deploy
+Examples
+
+- Get a JWT from Google ID token (replace <ID_TOKEN>):
 
 ```bash
-npm run deploy
+curl -s -X POST http://localhost:8787/auth \
+  -H "Content-Type: application/json" \
+  -d '{"id_token":"<ID_TOKEN>"}'
 ```
 
-After first deployment, wait 2-3 minutes for container provisioning before making requests.
+- Run a DBT project and stream logs (replace <JWT> and project.zip):
 
-## Next Steps
+```bash
+curl -N -X POST http://localhost:8787/api/run \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Accept: text/event-stream" \
+  -F "project_zip=@project.zip"
+```
 
-This minimal example is the starting point for more complex applications. See the [Sandbox SDK documentation](https://developers.cloudflare.com/sandbox/) for:
+Notes
 
-- Advanced command execution and streaming
-- Background processes
-- Preview URLs for exposed services
-- Custom Docker images
+- The Worker streams logs as SSE events. Use `curl -N` or a browser EventSource to consume the stream.
+- The included `Dockerfile` builds a Sandbox image with Python and common DBT dependencies; adjust it if your DBT runner image requires different packages.
+- `wrangler dev` provisions local sandbox containers; container startup can take a short time on first run.
+
+Contributing / Troubleshooting
+
+- Use `npm run typecheck` to validate TypeScript.
+- If `wrangler dev` reports missing Durable Object exports, ensure `src/index.ts` exports `Sandbox` (this project does so).
+- For container-related 5xx errors during `sandbox.createSession` or similar, check the Wrangler logs and the local Docker environment (image build / available resources).
