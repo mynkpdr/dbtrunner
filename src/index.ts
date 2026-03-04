@@ -167,8 +167,10 @@ export default {
         // Run Pipeline
         await runStep("python3 convert.py", "python-convert");
         await runStep("dbt deps --no-use-colors", "dbt-deps");
+        await runStep("dbt debug --no-use-colors", "dbt-debug");
         await runStep("dbt seed --no-use-colors", "dbt-seed");
         await runStep("dbt run --no-use-colors", "dbt-run");
+        await runStep("dbt test --no-use-colors", "dbt-test");
 
         await sendLog("✅ Pipeline complete!");
       } catch (e: any) {
