@@ -92,6 +92,8 @@ export default {
 
     if (request.method === "OPTIONS")
       return new Response(null, { headers: CORS_HEADERS(request) });
+    if (pathname === "/health")
+      return jsonRes(request, { status: "healthy" });
     if (pathname === "/auth" && request.method === "POST")
       return handleAuth(request, env);
     if (pathname !== "/api/run" || request.method !== "POST")
